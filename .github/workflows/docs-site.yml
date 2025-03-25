@@ -21,6 +21,9 @@ concurrency:
   group: "pages"
   cancel-in-progress: false
 
+env:
+  DOCS_SITE_BASE_URL: /kphp
+
 jobs:
   # Build job
   build:
@@ -35,7 +38,7 @@ jobs:
         id: docker-image-cache
         with:
           path: docs-build-env.tar
-          key: docs-docker-image-cache
+          key: docs-docker-image-cache-${{ hashFiles('.github/workflows/Dockerfile.docs') }}
   
       - name: Build and save docker image
         if: steps.docker-image-cache.outputs.cache-hit != 'true'
@@ -54,18 +57,18 @@ jobs:
         run: |
           docker run -dt --name docs-build-container docs-build-img-cache
           docker cp $GITHUB_WORKSPACE/docs docs-build-container:/home/kitten/docs
-  
-      - name: Build with Jekyll
+
+      - name: Build site with Jekyll
         run: docker exec docs-build-container bash -c 
-                "bundle exec jekyll build --source /home/kitten/docs --destination /home/kitten/docs/_site --trace"
+                "cd /home/kitten/docs && bundle install && bundle exec jekyll build --baseurl ${{env.DOCS_SITE_BASE_URL}} --source /home/kitten/docs --destination /home/kitten/docs/_site --trace"
                 
       - name: Prepare artifacts
-        run: docker cp docs-build-container:/home/kitten/docs/_site $GITHUB_WORKSPACE/ 
+        run: docker cp docs-build-container:/home/kitten/docs/_site $GITHUB_WORKSPACE/ && tree $GITHUB_WORKSPACE/_site
  
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: $GITHUB_WORKSPACE/_site
+          path: ./_site
 
   # Deployment job
   deploy:
